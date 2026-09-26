@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Pautado">
+<meta name="theme-color" content="#2B45C9">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Pautado</title>
+<style>
+:root{
+  --bg:#E9EDF2;--surface:#FFFFFF;--ink:#1B2433;--muted:#667085;--line:#D3DAE4;--accent:#2B45C9;--on-accent:#fff;--danger:#C4453B;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#10141A;--surface:#1A2029;--ink:#E5E9F0;--muted:#8D97A8;--line:#2C3441;--accent:#8EA0FF;--on-accent:#10141A;--danger:#FF8A80;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+button,select{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-height:40px;padding:0 14px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.btn.danger{color:var(--danger)}
+.link{background:none;border:0;padding:6px 0;color:var(--accent);font-size:14px}
+.link.danger{color:var(--danger)}
+.grow{flex:1}
+
+/* Biblioteca */
+#library{max-width:1100px;margin:0 auto;padding:24px 16px}
+#library header{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+#library h1{margin:0;font:700 30px/1.1 Palatino,"Palatino Linotype",Georgia,serif;letter-spacing:-.01em}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:24px 20px}
+.card{display:grid;gap:6px}
+.cover{aspect-ratio:3/4;border:0;border-radius:4px 12px 12px 4px;padding:14px;display:flex;align-items:flex-start;text-align:left;color:#fff;
+  font:600 17px/1.25 Palatino,Georgia,serif;box-shadow:inset 8px 0 0 rgba(0,0,0,.18),0 6px 16px rgba(20,30,50,.18);overflow-wrap:anywhere}
+.meta small{display:block;color:var(--muted)}
+.card .row{display:flex;gap:14px}
+#empty{color:var(--muted)}
+
+/* Editor */
+#editor{min-height:100vh}
+.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 16px;display:grid;gap:8px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#title{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:30vw}
+#pnum{font-variant-numeric:tabular-nums;min-width:56px;text-align:center;color:var(--muted)}
+select{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-height:40px;padding:0 10px}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:none;min-height:40px;padding:0 14px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);font-weight:600}
+#swatches,#widths{display:flex;gap:6px;align-items:center}
+.sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line)}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--accent)}
+.wd{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
+.wd i{display:block;border-radius:50%;background:var(--ink)}
+.wd[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.stage{padding:20px 16px 40px}
+#sheet{position:relative;width:100%;max-width:900px;margin:0 auto;aspect-ratio:1000/1414;background:#fff;box-shadow:0 2px 12px rgba(20,30,50,.15);border-radius:2px}
+#sheet canvas{position:absolute;inset:0;width:100%;height:100%}
+#live{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+
+/* Painel de texto */
+.panel{position:fixed;inset:auto 0 0 0;z-index:10;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(20,30,50,.18);
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto}
+.panel-in{max-width:900px;margin:0 auto;display:grid;gap:12px}
+.hint{margin:0;color:var(--muted);font-size:14px}
+#tx{width:100%;min-height:130px;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--bg);color:var(--ink);resize:vertical;line-height:1.35}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.chips button{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:22px;line-height:1.2;text-align:left}
+.chips button small{display:block;font:12px -apple-system,system-ui,sans-serif;color:var(--muted)}
+.chips button[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.panel .bar label{display:flex;align-items:center;gap:8px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<section id="library">
+  <header>
+    <h1>Pautado</h1>
+    <span class="grow"></span>
+    <button id="new" class="btn primary">+ Novo caderno</button>
+  </header>
+  <div id="grid"></div>
+  <p id="empty" hidden>Nenhum caderno ainda. Toque em “Novo caderno”.</p>
+</section>
+
+<section id="editor" hidden>
+  <div class="top">
+    <div class="bar">
+      <button id="back" class="btn">‹ Cadernos</button>
+      <span id="title"></span>
+      <span class="grow"></span>
+      <button id="prev" class="btn" aria-label="Página anterior">‹</button>
+      <span id="pnum"></span>
+      <button id="next" class="btn" aria-label="Próxima página">›</button>
+      <button id="addPage" class="btn">+ Página</button>
+      <button id="delPage" class="btn danger">Apagar página</button>
+      <select id="paper" aria-label="Papel">
+        <option value="pautado">Pautado</option>
+        <option value="quadriculado">Quadriculado</option>
+        <option value="pontilhado">Pontilhado</option>
+        <option value="liso">Liso</option>
+      </select>
+      <button id="pdf" class="btn">Exportar PDF</button>
+    </div>
+    <div class="bar">
+      <div class="seg" role="group" aria-label="Ferramentas">
+        <button data-tool="pen">Caneta</button>
+        <button data-tool="hl">Marca-texto</button>
+        <button data-tool="eraser">Borracha</button>
+        <button data-tool="text">Texto</button>
+      </div>
+      <div id="swatches"></div>
+      <div id="widths"></div>
+      <span class="grow"></span>
+      <button id="undo" class="btn">Desfazer</button>
+    </div>
+  </div>
+  <div class="stage">
+    <div id="sheet"><canvas id="base"></canvas><canvas id="live"></canvas></div>
+  </div>
+</section>
+
+<div id="textPanel" class="panel" hidden>
+  <div class="panel-in">
+    <p class="hint">Escreva com o Apple Pencil na caixa abaixo: o iPad converte sua letra em texto. Depois escolha a fonte.</p>
+    <textarea id="tx" placeholder="Escreva aqui com a caneta…"></textarea>
+    <div id="chips" class="chips" role="group" aria-label="Fontes"></div>
+    <div class="bar">
+      <label for="tsize">Tamanho <input type="range" id="tsize" min="20" max="100" value="40"></label>
+      <span class="grow"></span>
+      <button id="tdel" class="btn danger">Apagar texto</button>
+      <button id="tcancel" class="btn">Cancelar</button>
+      <button id="tok" class="btn primary">Colocar na página</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const W = 1000, H = 1414; // unidades da página (proporção A4)
+// Fontes que já vêm no iPad: funcionam offline sem baixar nada
+const FONTS = [
+  ['Snell Roundhand', 'Caligrafia', 'cursive'], ['Savoye LET', 'Convite', 'cursive'],
+  ['Zapfino', 'Artística', 'cursive'], ['Bradley Hand', 'Manuscrita', 'cursive'],
+  ['Noteworthy', 'Caderno', 'cursive'], ['Chalkboard SE', 'Giz', 'cursive'],
+  ['Didot', 'Revista', 'serif'], ['Baskerville', 'Livro', 'serif'],
+  ['Palatino', 'Clássica', 'serif'], ['American Typewriter', 'Máquina', 'serif'],
+  ['Avenir Next', 'Moderna', 'sans-serif'], ['Futura', 'Geométrica', 'sans-serif'],
+];
+const PALETTES = { pen: ['#1B1F27', '#2B45C9', '#D2382F', '#2E8B57', '#7B3FB5', '#E07A1F'], hl: ['#FFE14D', '#8EF08E', '#FF9FD0', '#9FD4FF'] };
+const WIDTHS = { pen: [2, 4, 7], hl: [10, 18, 28] };
+const COVERS = ['#2B45C9', '#C4453B', '#2E7D5B', '#6B3FA0', '#C07A12', '#37474F'];
+const opts = { pen: { color: PALETTES.pen[0], width: 4 }, hl: { color: PALETTES.hl[0], width: 18 } };
+
+const $ = s => document.querySelector(s);
+const base = $('#base'), live = $('#live'), bctx = base.getContext('2d'), lctx = live.getContext('2d');
+const fontStack = f => `"${f}", ${(FONTS.find(x => x[0] === f) || FONTS[0])[2]}`;
+const blankPage = () => ({ strokes: [], texts: [] });
+
+let db = { notebooks: [] }, nb = null, pi = 0, tool = 'pen', undoStack = [];
+const page = () => nb.pages[pi];
+
+/* ---------- Armazenamento (IndexedDB, fica no iPad) ---------- */
+const idb = new Promise((res, rej) => {
+  const r = indexedDB.open('pautado', 1);
+  r.onupgradeneeded = () => r.result.createObjectStore('kv');
+  r.onsuccess = () => res(r.result);
+  r.onerror = () => rej(r.error);
+});
+const idbGet = async k => { const d = await idb; return new Promise((res, rej) => { const r = d.transaction('kv').objectStore('kv').get(k); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); };
+const idbSet = async (k, v) => { const d = await idb; return new Promise((res, rej) => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = res; t.onerror = () => rej(t.error); }); };
+// ponytail: salva o banco inteiro a cada mudança; se ficar lento com cadernos enormes, salvar por caderno
+let saveTimer;
+const flush = () => idbSet('db', db).catch(e => alert('Não consegui salvar suas anotações: ' + e.message));
+const save = () => { clearTimeout(saveTimer); saveTimer = setTimeout(flush, 400); };
+document.addEventListener('visibilitychange', () => { if (document.hidden) { clearTimeout(saveTimer); flush(); } });
+
+/* ---------- Biblioteca ---------- */
+function showLibrary() {
+  nb = null;
+  $('#editor').hidden = true; $('#library').hidden = false;
+  const g = $('#grid'); g.replaceChildren();
+  for (const n of db.notebooks) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `<button class="cover"><span></span></button>
+      <div class="meta"><b></b><small>${n.pages.length} página${n.pages.length > 1 ? 's' : ''}</small></div>
+      <div class="row"><button class="link" data-a="ren">Renomear</button><button class="link danger" data-a="del">Apagar</button></div>`;
+    card.querySelector('.cover').style.background = n.color;
+    card.querySelector('.cover span').textContent = n.name;
+    card.querySelector('b').textContent = n.name;
+    card.querySelector('.cover').onclick = () => openNotebook(n);
+    card.querySelector('[data-a=ren]').onclick = () => {
+      const v = prompt('Novo nome do caderno', n.name);
+      if (v?.trim()) { n.name = v.trim(); save(); showLibrary(); }
+    };
+    card.querySelector('[data-a=del]').onclick = () => {
+      if (!confirm(`Apagar "${n.name}" e todas as páginas? Não dá para desfazer.`)) return;
+      db.notebooks = db.notebooks.filter(x => x !== n); save(); showLibrary();
+    };
+    g.append(card);
+  }
+  $('#empty').hidden = db.notebooks.length > 0;
+}
+
+function newNotebook(name) {
+  const n = { id: Date.now(), name, color: COVERS[db.notebooks.length % COVERS.length], paper: 'pautado', pages: [blankPage()] };
+  db.notebooks.push(n); save();
+  return n;
+}
+$('#new').onclick = () => {
+  const name = prompt('Nome do caderno', `Caderno ${db.notebooks.length + 1}`);
+  if (name?.trim()) openNotebook(newNotebook(name.trim()));
+};
+
+/* ---------- Editor ---------- */
+function openNotebook(n) {
+  nb = n; pi = 0; undoStack = [];
+  $('#library').hidden = true; $('#editor').hidden = false;
+  $('#title').textContent = n.name;
+  $('#paper').value = n.paper;
+  scrollTo(0, 0);
+  sizeCanvases();
+}
+function sizeCanvases() {
+  const dpr = devicePixelRatio || 1, w = $('#sheet').clientWidth;
+  for (const c of [base, live]) {
+    c.width = Math.round(w * dpr); c.height = Math.round(w * H / W * dpr);
+    c.getContext('2d').setTransform(c.width / W, 0, 0, c.width / W, 0, 0);
+  }
+  redraw();
+}
+addEventListener('resize', () => nb && sizeCanvases());
+
+function redraw() {
+  drawPage(bctx, page(), nb.paper);
+  lctx.clearRect(0, 0, W, H);
+  $('#pnum').textContent = `${pi + 1} / ${nb.pages.length}`;
+}
+function drawPage(ctx, p, paper) {
+  drawPaper(ctx, paper);
+  p.strokes.forEach(s => drawStroke(ctx, s));
+  p.texts.forEach(t => drawText(ctx, t));
+}
+function drawPaper(ctx, paper) {
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  ctx.lineWidth = 1.2;
+  const line = (x1, y1, x2, y2) => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
+  if (paper === 'pautado') {
+    ctx.strokeStyle = '#C8D5EA';
+    for (let y = 160; y < H - 40; y += 48) line(0, y, W, y);
+    ctx.strokeStyle = '#EBB8B8'; line(100, 0, 100, H);
+  } else if (paper === 'quadriculado') {
+    ctx.strokeStyle = '#DCE3EE';
+    for (let x = 40; x < W; x += 40) line(x, 0, x, H);
+    for (let y = 40; y < H; y += 40) line(0, y, W, y);
+  } else if (paper === 'pontilhado') {
+    ctx.fillStyle = '#B9C3D3';
+    for (let x = 40; x < W; x += 40) for (let y = 40; y < H; y += 40) ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+  }
+}
+// pts é plano: [x, y, pressão, x, y, pressão, ...]
+function drawStroke(ctx, s) {
+  const p = s.pts;
+  ctx.save();
+  ctx.lineCap = ctx.lineJoin = 'round';
+  ctx.strokeStyle = ctx.fillStyle = s.color;
+  if (s.tool === 'hl') {
+    ctx.globalAlpha = .45; ctx.globalCompositeOperation = 'multiply'; ctx.lineWidth = s.width;
+    ctx.beginPath(); ctx.moveTo(p[0], p[1]);
+    for (let i = 3; i < p.length; i += 3) ctx.lineTo(p[i], p[i + 1]);
+    if (p.length === 3) ctx.lineTo(p[0] + .1, p[1]);
+    ctx.stroke();
+  } else {
+    if (p.length === 3) { ctx.beginPath(); ctx.arc(p[0], p[1], s.width * (.6 + p[2] * .8) / 2, 0, 7); ctx.fill(); }
+    for (let i = 3; i < p.length; i += 3) {
+      ctx.lineWidth = s.width * (.6 + p[i + 2] * .8);
+      ctx.beginPath(); ctx.moveTo(p[i - 3], p[i - 2]); ctx.lineTo(p[i], p[i + 1]); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function layout(ctx, t) {
+  ctx.font = `${t.size}px ${fontStack(t.font)}`;
+  const maxW = W - 40 - t.x, lines = [];
+  for (const para of t.text.split('\n')) {
+    let line = '';
+    for (const word of para.split(' ')) {
+      const s = line ? line + ' ' + word : word;
+      if (line && ctx.measureText(s).width > maxW) { lines.push(line); line = word; } else line = s;
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+function drawText(ctx, t) {
+  ctx.save();
+  ctx.fillStyle = t.color; ctx.textBaseline = 'top';
+  layout(ctx, t).forEach((l, i) => ctx.fillText(l, t.x, t.y + i * t.size * 1.35));
+  ctx.restore();
+}
+function textAt([x, y]) {
+  return [...page().texts].reverse().find(t =>
+    x >= t.x - 10 && x <= W - 40 && y >= t.y - 10 && y <= t.y + layout(bctx, t).length * t.size * 1.35 + 10);
+}
+
+/* ---------- Caneta ---------- */
+function pushUndo(snap = structuredClone(page())) {
+  undoStack.push({ n: nb, pi, snap });
+  if (undoStack.length > 50) undoStack.shift();
+}
+$('#undo').onclick = () => {
+  const u = undoStack.pop();
+  if (!u) return;
+  u.n.pages[u.pi] = u.snap; pi = u.pi; save(); redraw();
+};
+
+function toPage(e) {
+  const r = live.getBoundingClientRect(), k = W / r.width, round = v => Math.round(v * 10) / 10;
+  return [round((e.clientX - r.left) * k), round((e.clientY - r.top) * k), e.pointerType === 'pen' ? Math.round(e.pressure * 100) / 100 : .5];
+}
+let cur = null, erasing = null;
+function eraseAt(pt) {
+  const p = page(), before = p.strokes.length + p.texts.length;
+  p.strokes = p.strokes.filter(s => {
+    const r = 14 + s.width / 2;
+    for (let i = 0; i < s.pts.length; i += 3) {
+      const dx = s.pts[i] - pt[0], dy = s.pts[i + 1] - pt[1];
+      if (dx * dx + dy * dy < r * r) return false;
+    }
+    return true;
+  });
+  const t = textAt(pt);
+  if (t) p.texts = p.texts.filter(x => x !== t);
+  if (p.strokes.length + p.texts.length !== before) { erasing.changed = true; redraw(); }
+}
+live.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch') return; // dedo rola a página; só a caneta (ou mouse) escreve
+  live.setPointerCapture(e.pointerId);
+  const pt = toPage(e);
+  if (tool === 'text') return openText(textAt(pt), pt);
+  if (tool === 'eraser') { erasing = { snap: structuredClone(page()), changed: false }; return eraseAt(pt); }
+  pushUndo();
+  cur = { tool, color: opts[tool].color, width: opts[tool].width, pts: pt };
+  drawLive();
+});
+live.addEventListener('pointermove', e => {
+  if (!cur && !erasing) return;
+  const evs = e.getCoalescedEvents?.() ?? [];
+  for (const ev of evs.length ? evs : [e]) {
+    const pt = toPage(ev);
+    if (erasing) eraseAt(pt); else cur.pts.push(...pt);
+  }
+  drawLive();
+});
+function endStroke() {
+  if (cur) {
+    page().strokes.push(cur); drawStroke(bctx, cur);
+    cur = null; lctx.clearRect(0, 0, W, H); save();
+  }
+  if (erasing) {
+    if (erasing.changed) { pushUndo(erasing.snap); save(); }
+    erasing = null;
+  }
+}
+live.addEventListener('pointerup', endStroke);
+live.addEventListener('pointercancel', endStroke);
+function drawLive() { lctx.clearRect(0, 0, W, H); if (cur) drawStroke(lctx, cur); }
+// Impede que a caneta role a tela no iPad; o dedo continua rolando
+for (const ev of ['touchstart', 'touchmove'])
+  live.addEventListener(ev, e => { if ([...e.touches].some(t => t.touchType === 'stylus')) e.preventDefault(); }, { passive: false });
+
+/* ---------- Barra de ferramentas ---------- */
+function renderTools() {
+  document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === tool));
+  const k = tool === 'hl' ? 'hl' : 'pen';
+  $('#swatches').hidden = tool === 'eraser';
+  $('#swatches').replaceChildren(...PALETTES[k].map(c => {
+    const b = document.createElement('button');
+    b.className = 'sw'; b.style.background = c;
+    b.setAttribute('aria-label', 'Cor ' + c);
+    b.setAttribute('aria-pressed', opts[k].color === c);
+    b.onclick = () => { opts[k].color = c; renderTools(); };
+    return b;
+  }));
+  $('#widths').hidden = tool === 'eraser' || tool === 'text';
+  $('#widths').replaceChildren(...WIDTHS[k].map((w, i) => {
+    const b = document.createElement('button');
+    b.className = 'wd'; b.innerHTML = `<i style="width:${6 + i * 5}px;height:${6 + i * 5}px"></i>`;
+    b.setAttribute('aria-label', ['Fina', 'Média', 'Grossa'][i]);
+    b.setAttribute('aria-pressed', opts[k].width === w);
+    b.onclick = () => { opts[k].width = w; renderTools(); };
+    return b;
+  }));
+}
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = b.dataset.tool; renderTools(); });
+
+$('#back').onclick = () => { clearTimeout(saveTimer); flush(); showLibrary(); };
+$('#prev').onclick = () => { if (pi > 0) { pi--; redraw(); } };
+$('#next').onclick = () => { if (pi < nb.pages.length - 1) { pi++; redraw(); } };
+$('#addPage').onclick = () => { nb.pages.splice(pi + 1, 0, blankPage()); pi++; undoStack = []; save(); redraw(); };
+$('#delPage').onclick = () => {
+  if (!confirm('Apagar esta página? Não dá para desfazer.')) return;
+  if (nb.pages.length === 1) nb.pages[0] = blankPage();
+  else { nb.pages.splice(pi, 1); pi = Math.min(pi, nb.pages.length - 1); }
+  undoStack = []; save(); redraw();
+};
+$('#paper').onchange = e => { nb.paper = e.target.value; save(); redraw(); };
+
+/* ---------- Texto (passar a limpo) ---------- */
+let editing = null, at = null, textFont = FONTS[0][0];
+function styleTx() {
+  const tx = $('#tx');
+  tx.style.fontFamily = fontStack(textFont);
+  tx.style.fontSize = Math.max(16, $('#tsize').value * $('#sheet').clientWidth / W) + 'px';
+  tx.style.color = editing ? editing.color : opts.pen.color;
+  document.querySelectorAll('#chips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.font === textFont));
+}
+$('#chips').append(...FONTS.map(([name, label, fb]) => {
+  const b = document.createElement('button');
+  b.dataset.font = name; b.style.fontFamily = `"${name}", ${fb}`;
+  b.innerHTML = `Aa Bb<small>${label}</small>`;
+  b.onclick = () => { textFont = name; styleTx(); };
+  return b;
+}));
+$('#tsize').oninput = styleTx;
+function openText(t, pt) {
+  editing = t; at = pt;
+  $('#tx').value = t ? t.text : '';
+  if (t) { textFont = t.font; $('#tsize').value = t.size; }
+  $('#tdel').hidden = !t;
+  $('#textPanel').hidden = false;
+  styleTx();
+  $('#tx').focus();
+}
+const closeText = () => { $('#textPanel').hidden = true; editing = null; };
+$('#tcancel').onclick = closeText;
+$('#tdel').onclick = () => { pushUndo(); page().texts = page().texts.filter(x => x !== editing); save(); redraw(); closeText(); };
+$('#tok').onclick = () => {
+  const text = $('#tx').value.trim(), size = +$('#tsize').value;
+  if (!text) return closeText();
+  pushUndo();
+  if (editing) Object.assign(editing, { text, font: textFont, size });
+  else {
+    page().texts.push({ x: Math.min(Math.max(at[0], 40), W - 300), y: at[1], text, font: textFont, size, color: opts.pen.color });
+  }
+  save(); redraw(); closeText();
+};
+
+/* ---------- PDF ---------- */
+function jpegBytes(url) {
+  const b = atob(url.split(',')[1]), u = new Uint8Array(b.length);
+  for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+  return u;
+}
+// PDF mínimo: uma imagem JPEG por página A4 (595x842 pt)
+function makePdf(imgs) {
+  const enc = new TextEncoder(), parts = [], offs = [];
+  let len = 0;
+  const put = x => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; };
+  const obj = (n, ...xs) => { offs[n] = len; put(`${n} 0 obj\n`); xs.forEach(put); put('\nendobj\n'); };
+  put('%PDF-1.4\n');
+  obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2, `<< /Type /Pages /Kids [${imgs.map((_, i) => `${3 + i * 3} 0 R`).join(' ')}] /Count ${imgs.length} >>`);
+  imgs.forEach((im, i) => {
+    const o = 3 + i * 3, draw = 'q 595 0 0 842 0 0 cm /Im0 Do Q';
+    obj(o, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 ${o + 2} 0 R >> >> /Contents ${o + 1} 0 R >>`);
+    obj(o + 1, `<< /Length ${draw.length} >>\nstream\n${draw}\nendstream`);
+    obj(o + 2, `<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>\nstream\n`, im.bytes, '\nendstream');
+  });
+  const xref = len, count = 3 + imgs.length * 3;
+  put(`xref\n0 ${count}\n0000000000 65535 f \n`);
+  for (let i = 1; i < count; i++) put(String(offs[i]).padStart(10, '0') + ' 00000 n \n');
+  put(`trailer\n<< /Size ${count} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+  return new Blob(parts, { type: 'application/pdf' });
+}
+$('#pdf').onclick = async () => {
+  const c = document.createElement('canvas'); c.width = 1240; c.height = 1754; // A4 a 150 dpi
+  const ctx = c.getContext('2d'); ctx.setTransform(c.width / W, 0, 0, c.width / W, 0, 0);
+  const imgs = nb.pages.map(p => { drawPage(ctx, p, nb.paper); return { w: c.width, h: c.height, bytes: jpegBytes(c.toDataURL('image/jpeg', .9)) }; });
+  const file = new File([makePdf(imgs)], `${nb.name}.pdf`, { type: 'application/pdf' });
+  if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file] }); } catch {} return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file); a.download = file.name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+};
+
+/* ---------- Início ---------- */
+(async () => {
+  try { db = (await idbGet('db')) || db; }
+  catch (e) { alert('Não consegui abrir suas anotações: ' + e.message); }
+  if (!db.notebooks.length) newNotebook('Meu primeiro caderno');
+  navigator.storage?.persist?.();
+  renderTools();
+  showLibrary();
+})();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
