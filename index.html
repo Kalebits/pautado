@@ -64,18 +64,12 @@ select{background:var(--surface);border:1px solid var(--line);border-radius:10px
 #sheet{position:relative;width:100%;max-width:900px;margin:0 auto;aspect-ratio:1000/1414;background:#fff;box-shadow:0 2px 12px rgba(20,30,50,.15);border-radius:2px}
 #sheet canvas{position:absolute;inset:0;width:100%;height:100%}
 #live{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-
-/* Painel de texto */
-.panel{position:fixed;inset:auto 0 0 0;z-index:10;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(20,30,50,.18);
-  padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto}
-.panel-in{max-width:900px;margin:0 auto;display:grid;gap:12px}
-.hint{margin:0;color:var(--muted);font-size:14px}
-#tx{width:100%;min-height:130px;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--bg);color:var(--ink);resize:vertical;line-height:1.35}
-.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
-.chips button{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:22px;line-height:1.2;text-align:left}
-.chips button small{display:block;font:12px -apple-system,system-ui,sans-serif;color:var(--muted)}
-.chips button[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.panel .bar label{display:flex;align-items:center;gap:8px;color:var(--muted)}
+/* Camada de texto da página: no modo "Letra bonita" o Rabisco do iPad escreve direto nela */
+#body{position:absolute;inset:0;width:100%;height:100%;margin:0;border:0;background:transparent;resize:none;overflow:hidden;
+  color:#1B2433;outline:none;pointer-events:none;white-space:pre-wrap;overflow-wrap:break-word}
+#sheet.writing #body{pointer-events:auto}
+#sheet.writing #live{pointer-events:none}
+.hint{color:var(--muted);font-size:14px}
 </style>
 </head>
 <body>
@@ -114,36 +108,25 @@ select{background:var(--surface);border:1px solid var(--line);border-radius:10px
         <button data-tool="pen">Caneta</button>
         <button data-tool="hl">Marca-texto</button>
         <button data-tool="eraser">Borracha</button>
-        <button data-tool="text">Texto</button>
+        <button data-tool="write">Letra bonita</button>
       </div>
       <div id="swatches"></div>
       <div id="widths"></div>
+      <select id="font" aria-label="Estilo da letra"></select>
+      <span id="writeHint" class="hint">Escreva com o Pencil direto na página</span>
       <span class="grow"></span>
       <button id="undo" class="btn">Desfazer</button>
     </div>
   </div>
   <div class="stage">
-    <div id="sheet"><canvas id="base"></canvas><canvas id="live"></canvas></div>
+    <div id="sheet"><canvas id="base"></canvas><textarea id="body" aria-label="Texto da página" spellcheck="false"></textarea><canvas id="live"></canvas></div>
   </div>
 </section>
 
-<div id="textPanel" class="panel" hidden>
-  <div class="panel-in">
-    <p class="hint">Escreva com o Apple Pencil na caixa abaixo: o iPad converte sua letra em texto. Depois escolha a fonte.</p>
-    <textarea id="tx" placeholder="Escreva aqui com a caneta…"></textarea>
-    <div id="chips" class="chips" role="group" aria-label="Fontes"></div>
-    <div class="bar">
-      <label for="tsize">Tamanho <input type="range" id="tsize" min="20" max="100" value="40"></label>
-      <span class="grow"></span>
-      <button id="tdel" class="btn danger">Apagar texto</button>
-      <button id="tcancel" class="btn">Cancelar</button>
-      <button id="tok" class="btn primary">Colocar na página</button>
-    </div>
-  </div>
-</div>
-
 <script>
 const W = 1000, H = 1414; // unidades da página (proporção A4)
+const LINE = 48, BODY = { x: 115, y: 121, size: 30 }; // texto da página cai sobre as linhas do pautado (y = 160 + 48k)
+const DEFAULT_FONT = 'Noteworthy';
 // Fontes que já vêm no iPad: funcionam offline sem baixar nada
 const FONTS = [
   ['Snell Roundhand', 'Caligrafia', 'cursive'], ['Savoye LET', 'Convite', 'cursive'],
@@ -210,7 +193,7 @@ function showLibrary() {
 }
 
 function newNotebook(name) {
-  const n = { id: Date.now(), name, color: COVERS[db.notebooks.length % COVERS.length], paper: 'pautado', pages: [blankPage()] };
+  const n = { id: Date.now(), name, color: COVERS[db.notebooks.length % COVERS.length], paper: 'pautado', font: DEFAULT_FONT, pages: [blankPage()] };
   db.notebooks.push(n); save();
   return n;
 }
@@ -222,9 +205,11 @@ $('#new').onclick = () => {
 /* ---------- Editor ---------- */
 function openNotebook(n) {
   nb = n; pi = 0; undoStack = [];
+  n.font ||= DEFAULT_FONT; // cadernos criados antes da "Letra bonita"
   $('#library').hidden = true; $('#editor').hidden = false;
   $('#title').textContent = n.name;
   $('#paper').value = n.paper;
+  $('#font').value = n.font;
   scrollTo(0, 0);
   sizeCanvases();
 }
@@ -234,6 +219,7 @@ function sizeCanvases() {
     c.width = Math.round(w * dpr); c.height = Math.round(w * H / W * dpr);
     c.getContext('2d').setTransform(c.width / W, 0, 0, c.width / W, 0, 0);
   }
+  styleBody();
   redraw();
 }
 addEventListener('resize', () => nb && sizeCanvases());
@@ -241,12 +227,15 @@ addEventListener('resize', () => nb && sizeCanvases());
 function redraw() {
   drawPage(bctx, page(), nb.paper);
   lctx.clearRect(0, 0, W, H);
+  $('#body').value = page().body || '';
   $('#pnum').textContent = `${pi + 1} / ${nb.pages.length}`;
 }
-function drawPage(ctx, p, paper) {
+// Na tela o texto da página é o <textarea>; com `font` (no PDF) ele é desenhado no canvas
+function drawPage(ctx, p, paper, font) {
   drawPaper(ctx, paper);
   p.strokes.forEach(s => drawStroke(ctx, s));
   p.texts.forEach(t => drawText(ctx, t));
+  if (font && p.body) drawText(ctx, { x: BODY.x, y: BODY.y + (LINE - BODY.size) / 2, size: BODY.size, lh: LINE, text: p.body, font, color: '#1B2433' });
 }
 function drawPaper(ctx, paper) {
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
@@ -302,7 +291,7 @@ function layout(ctx, t) {
 function drawText(ctx, t) {
   ctx.save();
   ctx.fillStyle = t.color; ctx.textBaseline = 'top';
-  layout(ctx, t).forEach((l, i) => ctx.fillText(l, t.x, t.y + i * t.size * 1.35));
+  layout(ctx, t).forEach((l, i) => ctx.fillText(l, t.x, t.y + i * (t.lh || t.size * 1.35)));
   ctx.restore();
 }
 function textAt([x, y]) {
@@ -344,7 +333,6 @@ live.addEventListener('pointerdown', e => {
   if (e.pointerType === 'touch') return; // dedo rola a página; só a caneta (ou mouse) escreve
   live.setPointerCapture(e.pointerId);
   const pt = toPage(e);
-  if (tool === 'text') return openText(textAt(pt), pt);
   if (tool === 'eraser') { erasing = { snap: structuredClone(page()), changed: false }; return eraseAt(pt); }
   pushUndo();
   cur = { tool, color: opts[tool].color, width: opts[tool].width, pts: pt };
@@ -379,8 +367,11 @@ for (const ev of ['touchstart', 'touchmove'])
 /* ---------- Barra de ferramentas ---------- */
 function renderTools() {
   document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === tool));
-  const k = tool === 'hl' ? 'hl' : 'pen';
-  $('#swatches').hidden = tool === 'eraser';
+  const k = tool === 'hl' ? 'hl' : 'pen', writing = tool === 'write';
+  $('#sheet').classList.toggle('writing', writing);
+  if (!writing) $('#body').blur();
+  $('#font').hidden = $('#writeHint').hidden = !writing;
+  $('#swatches').hidden = tool === 'eraser' || writing;
   $('#swatches').replaceChildren(...PALETTES[k].map(c => {
     const b = document.createElement('button');
     b.className = 'sw'; b.style.background = c;
@@ -389,7 +380,7 @@ function renderTools() {
     b.onclick = () => { opts[k].color = c; renderTools(); };
     return b;
   }));
-  $('#widths').hidden = tool === 'eraser' || tool === 'text';
+  $('#widths').hidden = tool === 'eraser' || writing;
   $('#widths').replaceChildren(...WIDTHS[k].map((w, i) => {
     const b = document.createElement('button');
     b.className = 'wd'; b.innerHTML = `<i style="width:${6 + i * 5}px;height:${6 + i * 5}px"></i>`;
@@ -413,45 +404,18 @@ $('#delPage').onclick = () => {
 };
 $('#paper').onchange = e => { nb.paper = e.target.value; save(); redraw(); };
 
-/* ---------- Texto (passar a limpo) ---------- */
-let editing = null, at = null, textFont = FONTS[0][0];
-function styleTx() {
-  const tx = $('#tx');
-  tx.style.fontFamily = fontStack(textFont);
-  tx.style.fontSize = Math.max(16, $('#tsize').value * $('#sheet').clientWidth / W) + 'px';
-  tx.style.color = editing ? editing.color : opts.pen.color;
-  document.querySelectorAll('#chips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.font === textFont));
+/* ---------- Letra bonita: o Rabisco converte a letra direto na página ---------- */
+// ponytail: texto que passa do fim da página fica escondido; crie outra página para continuar
+function styleBody() {
+  const k = $('#sheet').clientWidth / W, b = $('#body');
+  b.style.fontFamily = fontStack(nb.font);
+  b.style.fontSize = BODY.size * k + 'px';
+  b.style.lineHeight = LINE * k + 'px';
+  b.style.padding = `${BODY.y * k}px ${40 * k}px 0 ${BODY.x * k}px`;
 }
-$('#chips').append(...FONTS.map(([name, label, fb]) => {
-  const b = document.createElement('button');
-  b.dataset.font = name; b.style.fontFamily = `"${name}", ${fb}`;
-  b.innerHTML = `Aa Bb<small>${label}</small>`;
-  b.onclick = () => { textFont = name; styleTx(); };
-  return b;
-}));
-$('#tsize').oninput = styleTx;
-function openText(t, pt) {
-  editing = t; at = pt;
-  $('#tx').value = t ? t.text : '';
-  if (t) { textFont = t.font; $('#tsize').value = t.size; }
-  $('#tdel').hidden = !t;
-  $('#textPanel').hidden = false;
-  styleTx();
-  $('#tx').focus();
-}
-const closeText = () => { $('#textPanel').hidden = true; editing = null; };
-$('#tcancel').onclick = closeText;
-$('#tdel').onclick = () => { pushUndo(); page().texts = page().texts.filter(x => x !== editing); save(); redraw(); closeText(); };
-$('#tok').onclick = () => {
-  const text = $('#tx').value.trim(), size = +$('#tsize').value;
-  if (!text) return closeText();
-  pushUndo();
-  if (editing) Object.assign(editing, { text, font: textFont, size });
-  else {
-    page().texts.push({ x: Math.min(Math.max(at[0], 40), W - 300), y: at[1], text, font: textFont, size, color: opts.pen.color });
-  }
-  save(); redraw(); closeText();
-};
+$('#body').oninput = e => { page().body = e.target.value; save(); };
+$('#font').append(...FONTS.map(([name, label]) => new Option(`${label} (${name})`, name)));
+$('#font').onchange = e => { nb.font = e.target.value; styleBody(); save(); };
 
 /* ---------- PDF ---------- */
 function jpegBytes(url) {
@@ -483,7 +447,7 @@ function makePdf(imgs) {
 $('#pdf').onclick = async () => {
   const c = document.createElement('canvas'); c.width = 1240; c.height = 1754; // A4 a 150 dpi
   const ctx = c.getContext('2d'); ctx.setTransform(c.width / W, 0, 0, c.width / W, 0, 0);
-  const imgs = nb.pages.map(p => { drawPage(ctx, p, nb.paper); return { w: c.width, h: c.height, bytes: jpegBytes(c.toDataURL('image/jpeg', .9)) }; });
+  const imgs = nb.pages.map(p => { drawPage(ctx, p, nb.paper, nb.font); return { w: c.width, h: c.height, bytes: jpegBytes(c.toDataURL('image/jpeg', .9)) }; });
   const file = new File([makePdf(imgs)], `${nb.name}.pdf`, { type: 'application/pdf' });
   if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file] }); } catch {} return; }
   const a = document.createElement('a');
