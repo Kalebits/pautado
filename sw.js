@@ -1,6 +1,6 @@
 // Guarda o app no iPad para abrir sem internet.
 // ponytail: ao mudar qualquer arquivo, troque a versão abaixo para o iPad baixar a nova
-const CACHE = 'pautado-v2';
+const CACHE = 'pautado-v3';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -56,7 +56,11 @@ select{background:var(--surface);border:1px solid var(--line);border-radius:10px
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);font-weight:600}
 #swatches,#widths{display:flex;gap:6px;align-items:center}
 .sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line)}
-.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--accent)}
+.sw[aria-pressed="true"],.pick[data-on]{box-shadow:0 0 0 2px var(--accent)}
+.pick{padding:0;overflow:hidden;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);-webkit-appearance:none;appearance:none;cursor:pointer}
+.pick::-webkit-color-swatch-wrapper{padding:0}
+.pick::-webkit-color-swatch{border:0;border-radius:50%;opacity:0}
+.pick[data-on]::-webkit-color-swatch{opacity:1}
 .wd{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
 .wd i{display:block;border-radius:50%;background:var(--ink)}
 .wd[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
@@ -379,7 +383,12 @@ function renderTools() {
     b.setAttribute('aria-pressed', opts[k].color === c);
     b.onclick = () => { opts[k].color = c; renderTools(); };
     return b;
+  }), Object.assign(document.createElement('input'), { // seletor de cores do próprio iPad (espectro, grade e RGB)
+    type: 'color', className: 'sw pick', value: opts[k].color, ariaLabel: 'Escolher qualquer cor',
+    oninput: e => { opts[k].color = e.target.value; },
+    onchange: renderTools,
   }));
+  $('#swatches .pick').toggleAttribute('data-on', !PALETTES[k].includes(opts[k].color));
   $('#widths').hidden = tool === 'eraser' || writing;
   $('#widths').replaceChildren(...WIDTHS[k].map((w, i) => {
     const b = document.createElement('button');
