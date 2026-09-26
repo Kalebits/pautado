@@ -69,8 +69,9 @@ select{background:var(--surface);border:1px solid var(--line);border-radius:10px
 #sheet canvas{position:absolute;inset:0;width:100%;height:100%}
 #live{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 /* Camada de texto da página: no modo "Letra bonita" o Rabisco do iPad escreve direto nela */
-#body{position:absolute;inset:0;width:100%;height:100%;margin:0;border:0;background:transparent;resize:none;overflow:hidden;
+#body,#mirror{position:absolute;inset:0;width:100%;height:100%;margin:0;border:0;background:transparent;resize:none;overflow:hidden;
   color:#1B2433;outline:none;pointer-events:none;white-space:pre-wrap;overflow-wrap:break-word}
+#mirror{visibility:hidden;height:auto;bottom:auto} /* cópia invisível do texto, só para medir em que linha ele termina */
 #sheet.writing #body{pointer-events:auto}
 #sheet.writing #live{pointer-events:none}
 .hint{color:var(--muted);font-size:14px}
@@ -123,7 +124,7 @@ select{background:var(--surface);border:1px solid var(--line);border-radius:10px
     </div>
   </div>
   <div class="stage">
-    <div id="sheet"><canvas id="base"></canvas><textarea id="body" aria-label="Texto da página" spellcheck="false"></textarea><canvas id="live"></canvas></div>
+    <div id="sheet"><canvas id="base"></canvas><div id="mirror" aria-hidden="true"></div><textarea id="body" aria-label="Texto da página" spellcheck="false"></textarea><canvas id="live"></canvas></div>
   </div>
 </section>
 
@@ -416,13 +417,27 @@ $('#paper').onchange = e => { nb.paper = e.target.value; save(); redraw(); };
 /* ---------- Letra bonita: o Rabisco converte a letra direto na página ---------- */
 // ponytail: texto que passa do fim da página fica escondido; crie outra página para continuar
 function styleBody() {
-  const k = $('#sheet').clientWidth / W, b = $('#body');
-  b.style.fontFamily = fontStack(nb.font);
-  b.style.fontSize = BODY.size * k + 'px';
-  b.style.lineHeight = LINE * k + 'px';
-  b.style.padding = `${BODY.y * k}px ${40 * k}px 0 ${BODY.x * k}px`;
+  const k = $('#sheet').clientWidth / W;
+  for (const b of [$('#body'), $('#mirror')]) {
+    b.style.fontFamily = fontStack(nb.font);
+    b.style.fontSize = BODY.size * k + 'px';
+    b.style.lineHeight = LINE * k + 'px';
+    b.style.padding = `${BODY.y * k}px ${40 * k}px 0 ${BODY.x * k}px`;
+  }
 }
 $('#body').oninput = e => { page().body = e.target.value; save(); };
+// Encostou o Pencil numa linha abaixo do fim do texto: pula até ela antes do Rabisco converter
+$('#body').addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch') return;
+  const b = $('#body'), m = $('#mirror'), k = b.clientWidth / W;
+  const target = Math.floor(((e.clientY - b.getBoundingClientRect().top) / k - BODY.y) / LINE);
+  m.textContent = b.value + '​';
+  const last = Math.round((m.offsetHeight / k - BODY.y) / LINE) - 1; // linha onde o texto termina
+  if (target <= last) return;
+  b.value += '\n'.repeat(target - last);
+  b.setSelectionRange(b.value.length, b.value.length);
+  page().body = b.value; save();
+});
 $('#font').append(...FONTS.map(([name, label]) => new Option(`${label} (${name})`, name)));
 $('#font').onchange = e => { nb.font = e.target.value; styleBody(); save(); };
 
